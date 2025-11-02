@@ -5,7 +5,7 @@ import plotly.express as px
 st.title('Análisis de Ventas y Ganancias de Productos')
 
 # Cargar los datos
-file_path = 'Orders Final Clean.xlsx'
+file_path = '/content/drive/MyDrive/Herramientas Datos 2025/Orders Final Clean.xlsx'
 df_orders = pd.read_excel(file_path)
 
 # Calcular las ventas y ganancias totales por producto
@@ -17,6 +17,8 @@ top_5_productos_ventas = ventas_por_producto.sort_values(ascending=False).head(5
 
 # Crear la gráfica de barras de ventas
 fig_ventas = px.bar(x=top_5_productos_ventas.index, y=top_5_productos_ventas.values, labels={'x':'Nombre del Producto', 'y':'Ventas Totales'}, title='Top 5 Productos Más Vendidos')
+fig_ventas.update_layout(xaxis={'categoryorder':'total descending', 'tickangle': -45, 'tickmode': 'array', 'tickvals': top_5_productos_ventas.index, 'ticktext': [name.replace(' ', '<br>') for name in top_5_productos_ventas.index]})
+
 
 # Mostrar la gráfica de barras de ventas
 st.header('Top 5 Productos Más Vendidos')
@@ -27,6 +29,8 @@ top_5_productos_ganancias = ganancias_por_producto.sort_values(ascending=False).
 
 # Crear la gráfica de barras de ganancias
 fig_ganancias = px.bar(x=top_5_productos_ganancias.index, y=top_5_productos_ganancias.values, labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'}, title='Top 5 Productos con Mayor Ganancia')
+fig_ganancias.update_layout(xaxis={'categoryorder':'total descending', 'tickangle': -45, 'tickmode': 'array', 'tickvals': top_5_productos_ganancias.index, 'ticktext': [name.replace(' ', '<br>') for name in top_5_productos_ganancias.index]})
+
 
 # Mostrar la gráfica de barras de ganancias
 st.header('Top 5 Productos con Mayor Ganancia')
@@ -53,6 +57,9 @@ st.markdown("""
 
 ### Próximos Pasos
 
+*   Investigar más a fondo los productos con alta discrepancia entre ventas y ganancias para optimizar estrategias de precios o costos.
+*   Considerar estrategias para replicar el éxito de los productos más rentables en otras categorías.
+""")
 *   Investigar más a fondo los productos con alta discrepancia entre ventas y ganancias para optimizar estrategias de precios o costos.
 *   Considerar estrategias para replicar el éxito de los productos más rentables en otras categorías.
 """)
