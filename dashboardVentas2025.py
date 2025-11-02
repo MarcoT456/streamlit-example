@@ -5,16 +5,34 @@ import textwrap
 import pydeck as pdk
 import numpy as np
 
-# --- Configuración de página ---
+# -------------------------
+# Configuración de página
+# -------------------------
 st.set_page_config(page_title="Análisis de Ventas y Ganancias", layout="wide")
-
 st.title("Análisis de Ventas y Ganancias de Productos")
 
-# --- Cargar los datos ---
-file_path = "Orders Final Clean.xlsx"
+# -------------------------
+# Carga y limpieza de datos
+# -------------------------
+file_path = "/content/drive/MyDrive/Herramientas Datos 2025/Orders Final Clean.xlsx"
 df_orders = pd.read_excel(file_path)
 
-# --- Normalizar columna de fecha ('Order Date') ---
+# 1) Eliminar duplicados exactos
+df_orders = df_orders.drop_duplicates().reset_index(drop=True)
+
+# 2) Corregir descuentos expresados como enteros (17 -> 0.17)
+if "Discount" in df_orders.columns:
+    mask_pct = (df_orders["Discount"] > 1) & (df_orders["Discount"] <= 100)
+    df_orders.loc[mask_pct, "Discount"] = df_orders.loc[mask_pct, "Discount"] / 100.0
+
+# 3) Unificar Ship Date y remover columna duplicada si existe
+if "Ship Date" in df_orders.columns and "Ship date" in df_orders.columns:
+    sd_main = pd.to_datetime(df_orders["Ship Date"], errors="coerce")
+    sd_alt  = pd.to_datetime(df_orders["Ship date"], errors="coerce")
+    df_orders["Ship Date"] = sd_main.fillna(sd_alt)
+    df_orders = df_orders.drop(columns=["Ship date"])
+
+# 4) Normalizar columna de fecha (Order Date)
 col_fecha = "Order Date"
 if pd.api.types.is_datetime64_any_dtype(df_orders[col_fecha]):
     pass
@@ -31,10 +49,13 @@ if df_orders[col_fecha].isna().all():
     st.error("No se pudo convertir correctamente la columna 'Order Date' a fecha.")
     st.stop()
 
-# --- Filtros laterales (con restricción de rango válido) ---
+# -------------------------
+# Filtros laterales
+# -------------------------
 with st.sidebar:
     st.header("Filtros")
 
+    # Rango real disponible en datos
     min_date = df_orders[col_fecha].min().date()
     max_date = df_orders[col_fecha].max().date()
 
@@ -52,6 +73,7 @@ with st.sidebar:
     else:
         start_date, end_date = min_date, max_date
 
+    # Validaciones adicionales (seguridad)
     clipped = False
     if start_date < min_date:
         start_date = min_date; clipped = True
@@ -59,10 +81,12 @@ with st.sidebar:
         end_date = max_date; clipped = True
     if clipped:
         st.info("Las fechas seleccionadas se ajustaron automáticamente al rango disponible en los datos.")
+
     if start_date > end_date:
         start_date, end_date = end_date, start_date
         st.warning("La fecha de inicio era mayor que la de fin. Se invirtieron para continuar.")
 
+    # Filtros opcionales
     region = None
     estado = None
     if "Region" in df_orders.columns:
@@ -72,7 +96,7 @@ with st.sidebar:
 
     mostrar_tabla = st.checkbox("Mostrar datos filtrados", value=True)
 
-# --- Aplicar filtros al DataFrame ---
+# Aplicación de filtros
 start_ts = pd.Timestamp(start_date)
 end_ts = pd.Timestamp(end_date)
 
@@ -88,30 +112,40 @@ if df_filtered.empty:
     st.warning("No hay datos para el rango de fechas (y filtros) seleccionado.")
     st.stop()
 
-st.success("Datos cargados correctamente.")
+st.success("Datos cargados y filtrados correctamente.")
 
-# --- Función para envolver etiquetas largas ---
+# -------------------------
+# Utilidad: envolver etiquetas largas
+# -------------------------
 def wrap_text(txt: str, width: int = 22) -> str:
     return "<br>".join(textwrap.wrap(str(txt), width=width))
 
-# --- Tabla de datos filtrados ---
+# -------------------------
+# Tabla de datos filtrados
+# -------------------------
 st.subheader("Datos filtrados")
 if mostrar_tabla:
-    cols_pref = ["Order Date", "Discount", "Sales", "Quantity", "Profit", "Region", "State", "Order ID", "Ship Date", "Product Name", "City"]
+    cols_pref = [
+        "Order Date","Discount","Sales","Quantity","Profit",
+        "Region","State","Order ID","Ship Date","Product Name","City"
+    ]
     cols_show = [c for c in cols_pref if c in df_filtered.columns]
     if not cols_show:
         cols_show = df_filtered.columns.tolist()
+
     st.dataframe(
         df_filtered[cols_show].sort_values(col_fecha),
         use_container_width=True,
         hide_index=True,
     )
 
-# --- Cálculos por producto ---
+# -------------------------
+# Agregaciones para gráficas
+# -------------------------
 ventas_por_producto = df_filtered.groupby("Product Name")["Sales"].sum()
 ganancias_por_producto = df_filtered.groupby("Product Name")["Profit"].sum()
 
-# --- Top 5 productos más vendidos ---
+# Top 5 por Ventas
 top_5_v = ventas_por_producto.sort_values(ascending=False).head(5)
 fig_ventas = px.bar(
     x=top_5_v.index,
@@ -128,7 +162,7 @@ fig_ventas.update_xaxes(
 st.header("Top 5 Productos Más Vendidos")
 st.plotly_chart(fig_ventas, use_container_width=True)
 
-# --- Top 5 productos con mayor ganancia ---
+# Top 5 por Ganancia
 top_5_g = ganancias_por_producto.sort_values(ascending=False).head(5)
 fig_ganancias = px.bar(
     x=top_5_g.index,
@@ -145,7 +179,7 @@ fig_ganancias.update_xaxes(
 st.header("Top 5 Productos con Mayor Ganancia")
 st.plotly_chart(fig_ganancias, use_container_width=True)
 
-# --- Dispersión Ventas vs Ganancias ---
+# Dispersión Ventas vs Ganancias
 df_summary = pd.concat([ventas_por_producto, ganancias_por_producto], axis=1)
 df_summary.columns = ["Ventas Totales", "Ganancias Totales"]
 fig_scatter = px.scatter(
@@ -158,13 +192,11 @@ fig_scatter = px.scatter(
 st.header("Relación entre Ventas y Ganancias por Producto")
 st.plotly_chart(fig_scatter, use_container_width=True)
 
-# =========================
-#  NUEVA SECCIÓN: MAPA PyDeck
-# =========================
-
+# -------------------------
+# Mapa PyDeck: Ventas por Estado
+# -------------------------
 st.header("Mapa de Ventas por Estado (PyDeck)")
 
-# 1) Agregación por estado
 if "State" not in df_filtered.columns:
     st.info("No se encontró la columna 'State'; no es posible generar el mapa por estado.")
 else:
@@ -174,19 +206,15 @@ else:
         .rename(columns={"Sales": "Ventas Totales"})
     )
 
-    # 2) Intento 1: usar lat/lon del dataset si existen
+    # Usar lat/lon del dataset si existen, sino centroides de USA
     has_latlon = ("Latitude" in df_filtered.columns) and ("Longitude" in df_filtered.columns)
 
     if has_latlon:
-        # promedio ponderado por ventas para el centro de cada estado
+        # centros ponderados por ventas
         def wavg(g, val_col, w_col):
-            d = g[val_col]
-            w = g[w_col]
-            if w.sum() == 0:
-                return d.mean()
-            return (d * w).sum() / w.sum()
+            d = g[val_col]; w = g[w_col]
+            return d.mean() if w.sum() == 0 else (d * w).sum() / w.sum()
 
-        # calcular centro por estado con ponderación por ventas
         latlon_state = (
             df_filtered.groupby("State")
             .apply(lambda g: pd.Series({
@@ -195,11 +223,8 @@ else:
             }))
             .reset_index()
         )
-
         df_map = df_state_sales.merge(latlon_state, on="State", how="left")
-
     else:
-        # 3) Intento 2: usar centroids de estados de USA (fallback)
         us_state_centroids = {
             "Alabama": (32.806671, -86.791130), "Alaska": (61.370716, -152.404419),
             "Arizona": (33.729759, -111.431221), "Arkansas": (34.969704, -92.373123),
@@ -232,7 +257,6 @@ else:
             lat=df_state_sales["State"].map(lambda s: us_state_centroids.get(s, (np.nan, np.nan))[0]),
             lon=df_state_sales["State"].map(lambda s: us_state_centroids.get(s, (np.nan, np.nan))[1]),
         )
-
         faltantes = df_map[df_map["lat"].isna()]["State"].tolist()
         if faltantes:
             st.info(f"Estados sin coordenadas conocidas (se omiten en el mapa): {', '.join(faltantes)}")
@@ -241,18 +265,16 @@ else:
     if df_map.empty:
         st.info("No hay datos georreferenciados para mostrar en el mapa.")
     else:
-        # Escalas para radio y color
         max_sales = float(df_map["Ventas Totales"].max())
         if max_sales <= 0:
             max_sales = 1.0
         df_map = df_map.assign(
-            radius=(df_map["Ventas Totales"] / max_sales) * 40000 + 3000,  # radio en metros
+            radius=(df_map["Ventas Totales"] / max_sales) * 40000 + 3000,
             color=df_map["Ventas Totales"].apply(
-                lambda v: [255, int(255 * (1 - v / max_sales)), 80, 160]  # gradiente simple
+                lambda v: [255, int(255 * (1 - v / max_sales)), 80, 160]
             ),
         )
 
-        # Vista inicial centrada en el promedio
         view_state = pdk.ViewState(
             latitude=float(df_map["lat"].mean()),
             longitude=float(df_map["lon"].mean()),
@@ -288,16 +310,18 @@ else:
 
         st.pydeck_chart(deck, use_container_width=True)
 
-# --- Resumen final ---
+# -------------------------
+# Resumen final
+# -------------------------
 st.markdown("""
 ## Resumen del Análisis
 
 **Hallazgos clave**
 - Se identifican los 5 productos con mayores **ventas** y los 5 con mayor **ganancia** dentro del rango seleccionado.
 - La dispersión **Ventas vs Ganancias** ayuda a detectar productos con **alta venta pero baja ganancia** (o viceversa).
-- El mapa PyDeck muestra la **distribución geográfica** de las ventas por estado y permite visualizar concentración y outliers regionales.
+- El mapa PyDeck muestra la **distribución geográfica** de las ventas por estado dentro del rango.
 
 **Próximos pasos**
-- Analizar estados con alto volumen de ventas para replicar estrategias en regiones similares.
-- Cruzar el mapa con márgenes de ganancia por estado para priorizar acciones comerciales.
+- Con la limpieza aplicada (duplicados, descuentos y fechas), las métricas reflejan mejor la realidad.
+- Considera cruzar las ventas con **márgenes por estado** para priorizar acciones comerciales.
 """)
