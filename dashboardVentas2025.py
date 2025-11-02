@@ -15,9 +15,25 @@ ganancias_por_producto = df_orders.groupby('Product Name')['Profit'].sum()
 # Identificar los top 5 productos por ventas
 top_5_productos_ventas = ventas_por_producto.sort_values(ascending=False).head(5)
 
+# Función para dividir nombres largos en múltiples líneas
+def wrap_text(text, length=15):
+    words = text.split()
+    lines = []
+    current_line = []
+    for word in words:
+        if sum(len(w) for w in current_line) + len(word) + len(current_line) > length:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+        else:
+            current_line.append(word)
+    if current_line:
+        lines.append(' '.join(current_line))
+    return '<br>'.join(lines)
+
+
 # Crear la gráfica de barras de ventas
 fig_ventas = px.bar(x=top_5_productos_ventas.index, y=top_5_productos_ventas.values, labels={'x':'Nombre del Producto', 'y':'Ventas Totales'}, title='Top 5 Productos Más Vendidos')
-fig_ventas.update_layout(xaxis={'categoryorder':'total descending', 'tickangle': -45, 'tickmode': 'array', 'tickvals': top_5_productos_ventas.index, 'ticktext': [name.replace(' ', '<br>') for name in top_5_productos_ventas.index]})
+fig_ventas.update_layout(xaxis={'categoryorder':'total descending', 'tickangle': -45, 'tickmode': 'array', 'tickvals': top_5_productos_ventas.index, 'ticktext': [wrap_text(name) for name in top_5_productos_ventas.index]})
 
 
 # Mostrar la gráfica de barras de ventas
@@ -29,7 +45,7 @@ top_5_productos_ganancias = ganancias_por_producto.sort_values(ascending=False).
 
 # Crear la gráfica de barras de ganancias
 fig_ganancias = px.bar(x=top_5_productos_ganancias.index, y=top_5_productos_ganancias.values, labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'}, title='Top 5 Productos con Mayor Ganancia')
-fig_ganancias.update_layout(xaxis={'categoryorder':'total descending', 'tickangle': -45, 'tickmode': 'array', 'tickvals': top_5_productos_ganancias.index, 'ticktext': [name.replace(' ', '<br>') for name in top_5_productos_ganancias.index]})
+fig_ganancias.update_layout(xaxis={'categoryorder':'total descending', 'tickangle': -45, 'tickmode': 'array', 'tickvals': top_5_productos_ganancias.index, 'ticktext': [wrap_text(name) for name in top_5_productos_ganancias.index]})
 
 
 # Mostrar la gráfica de barras de ganancias
@@ -56,9 +72,6 @@ st.markdown("""
 *   El gráfico de dispersión muestra la relación entre las ventas y ganancias para todos los productos, permitiendo identificar productos de alto rendimiento y aquellos que podrían requerir atención debido a bajas ganancias a pesar de altas ventas.
 
 ### Próximos Pasos
-
-*   Investigar más a fondo los productos con alta discrepancia entre ventas y ganancias para optimizar estrategias de precios o costos.
-*   Considerar estrategias para replicar el éxito de los productos más rentables en otras categorías.
 
 *   Investigar más a fondo los productos con alta discrepancia entre ventas y ganancias para optimizar estrategias de precios o costos.
 *   Considerar estrategias para replicar el éxito de los productos más rentables en otras categorías.
