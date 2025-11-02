@@ -5,7 +5,7 @@ import plotly.express as px
 st.title('Análisis de Ventas y Ganancias de Productos')
 
 # Cargar los datos
-file_path = '/content/drive/MyDrive/Herramientas Datos 2025/Orders Final Clean.xlsx'
+file_path = 'Orders Final Clean.xlsx'
 df_orders = pd.read_excel(file_path)
 
 # Calcular las ventas y ganancias totales por producto
