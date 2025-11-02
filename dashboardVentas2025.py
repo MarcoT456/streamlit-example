@@ -1,12 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import textwrap
 
 st.title('Análisis de Ventas y Ganancias de Productos')
 
 # Cargar los datos
-file_path = 'Orders Final Clean.xlsx'
+file_path = 'Datos 2025/Orders Final Clean.xlsx'
 df_orders = pd.read_excel(file_path)
 
 # Calcular las ventas y ganancias totales por producto
@@ -16,19 +15,8 @@ ganancias_por_producto = df_orders.groupby('Product Name')['Profit'].sum()
 # Identificar los top 5 productos por ventas
 top_5_productos_ventas = ventas_por_producto.sort_values(ascending=False).head(5)
 
-# Función para dividir nombres largos en múltiples líneas
-def wrap_text(text, width=20):
-    return '<br>'.join(textwrap.wrap(text, width=width))
-
-# Aplicar la función de ajuste a los nombres de productos para las gráficas de barras
-wrapped_ventas_labels = [wrap_text(name) for name in top_5_productos_ventas.index]
-wrapped_ganancias_labels = [wrap_text(name) for name in top_5_productos_ganancias.index]
-
-
 # Crear la gráfica de barras de ventas
-fig_ventas = px.bar(x=wrapped_ventas_labels, y=top_5_productos_ventas.values, labels={'x':'Nombre del Producto', 'y':'Ventas Totales'}, title='Top 5 Productos Más Vendidos')
-fig_ventas.update_layout(xaxis={'categoryorder':'total descending'}) # plotly handles wrapping with <br> automatically
-
+fig_ventas = px.bar(x=top_5_productos_ventas.index, y=top_5_productos_ventas.values, labels={'x':'Nombre del Producto', 'y':'Ventas Totales'}, title='Top 5 Productos Más Vendidos')
 
 # Mostrar la gráfica de barras de ventas
 st.header('Top 5 Productos Más Vendidos')
@@ -38,8 +26,7 @@ st.plotly_chart(fig_ventas)
 top_5_productos_ganancias = ganancias_por_producto.sort_values(ascending=False).head(5)
 
 # Crear la gráfica de barras de ganancias
-fig_ganancias = px.bar(x=wrapped_ganancias_labels, y=top_5_productos_ganancias.values, labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'}, title='Top 5 Productos con Mayor Ganancia')
-fig_ganancias.update_layout(xaxis={'categoryorder':'total descending'}) # plotly handles wrapping with <br> automatically
+fig_ganancias = px.bar(x=top_5_productos_ganancias.index, y=top_5_productos_ganancias.values, labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'}, title='Top 5 Productos con Mayor Ganancia')
 
 # Mostrar la gráfica de barras de ganancias
 st.header('Top 5 Productos con Mayor Ganancia')
