@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import textwrap
 
 st.title('Análisis de Ventas y Ganancias de Productos')
 
@@ -16,24 +17,17 @@ ganancias_por_producto = df_orders.groupby('Product Name')['Profit'].sum()
 top_5_productos_ventas = ventas_por_producto.sort_values(ascending=False).head(5)
 
 # Función para dividir nombres largos en múltiples líneas
-def wrap_text(text, length=15):
-    words = text.split()
-    lines = []
-    current_line = []
-    for word in words:
-        if sum(len(w) for w in current_line) + len(word) + len(current_line) > length:
-            lines.append(' '.join(current_line))
-            current_line = [word]
-        else:
-            current_line.append(word)
-    if current_line:
-        lines.append(' '.join(current_line))
-    return '<br>'.join(lines)
+def wrap_text(text, width=20):
+    return '<br>'.join(textwrap.wrap(text, width=width))
+
+# Aplicar la función de ajuste a los nombres de productos para las gráficas de barras
+wrapped_ventas_labels = [wrap_text(name) for name in top_5_productos_ventas.index]
+wrapped_ganancias_labels = [wrap_text(name) for name in top_5_productos_ganancias.index]
 
 
 # Crear la gráfica de barras de ventas
-fig_ventas = px.bar(x=top_5_productos_ventas.index, y=top_5_productos_ventas.values, labels={'x':'Nombre del Producto', 'y':'Ventas Totales'}, title='Top 5 Productos Más Vendidos')
-fig_ventas.update_layout(xaxis={'categoryorder':'total descending', 'tickangle': -45, 'tickmode': 'array', 'tickvals': top_5_productos_ventas.index, 'ticktext': [wrap_text(name) for name in top_5_productos_ventas.index]})
+fig_ventas = px.bar(x=wrapped_ventas_labels, y=top_5_productos_ventas.values, labels={'x':'Nombre del Producto', 'y':'Ventas Totales'}, title='Top 5 Productos Más Vendidos')
+fig_ventas.update_layout(xaxis={'categoryorder':'total descending'}) # plotly handles wrapping with <br> automatically
 
 
 # Mostrar la gráfica de barras de ventas
@@ -44,9 +38,8 @@ st.plotly_chart(fig_ventas)
 top_5_productos_ganancias = ganancias_por_producto.sort_values(ascending=False).head(5)
 
 # Crear la gráfica de barras de ganancias
-fig_ganancias = px.bar(x=top_5_productos_ganancias.index, y=top_5_productos_ganancias.values, labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'}, title='Top 5 Productos con Mayor Ganancia')
-fig_ganancias.update_layout(xaxis={'categoryorder':'total descending', 'tickangle': -45, 'tickmode': 'array', 'tickvals': top_5_productos_ganancias.index, 'ticktext': [wrap_text(name) for name in top_5_productos_ganancias.index]})
-
+fig_ganancias = px.bar(x=wrapped_ganancias_labels, y=top_5_productos_ganancias.values, labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'}, title='Top 5 Productos con Mayor Ganancia')
+fig_ganancias.update_layout(xaxis={'categoryorder':'total descending'}) # plotly handles wrapping with <br> automatically
 
 # Mostrar la gráfica de barras de ganancias
 st.header('Top 5 Productos con Mayor Ganancia')
