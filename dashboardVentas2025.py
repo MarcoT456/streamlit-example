@@ -16,7 +16,21 @@ ganancias_por_producto = df_orders.groupby('Product Name')['Profit'].sum()
 top_5_productos_ventas = ventas_por_producto.sort_values(ascending=False).head(5)
 
 # Crear la gráfica de barras de ventas
-fig_ventas = px.bar(x=top_5_productos_ventas.index, y=top_5_productos_ventas.values, labels={'x':'Nombre del Producto', 'y':'Ventas Totales'}, title='Top 5 Productos Más Vendidos')
+fig_ventas = px.bar(
+    x=top_5_productos_ventas.index,
+    y=top_5_productos_ventas.values,
+    labels={'x':'Nombre del Producto', 'y':'Ventas Totales'},
+    title='Top 5 Productos Más Vendidos'
+)
+
+# Ajustar las etiquetas del eje X para que estén horizontales y ordenadas
+fig_ventas.update_layout(
+    xaxis_tickangle=0,  # mantiene las etiquetas horizontales
+    xaxis_tickfont=dict(size=10),
+    margin=dict(b=150),  # agrega espacio inferior
+)
+fig_ventas.update_xaxes(tickmode='array', tickvals=list(range(len(top_5_productos_ventas))),
+                        ticktext=[f'<br>'.join(p.split()) for p in top_5_productos_ventas.index])
 
 # Mostrar la gráfica de barras de ventas
 st.header('Top 5 Productos Más Vendidos')
@@ -26,7 +40,21 @@ st.plotly_chart(fig_ventas)
 top_5_productos_ganancias = ganancias_por_producto.sort_values(ascending=False).head(5)
 
 # Crear la gráfica de barras de ganancias
-fig_ganancias = px.bar(x=top_5_productos_ganancias.index, y=top_5_productos_ganancias.values, labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'}, title='Top 5 Productos con Mayor Ganancia')
+fig_ganancias = px.bar(
+    x=top_5_productos_ganancias.index,
+    y=top_5_productos_ganancias.values,
+    labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'},
+    title='Top 5 Productos con Mayor Ganancia'
+)
+
+# Ajustar las etiquetas del eje X igual
+fig_ganancias.update_layout(
+    xaxis_tickangle=0,
+    xaxis_tickfont=dict(size=10),
+    margin=dict(b=150),
+)
+fig_ganancias.update_xaxes(tickmode='array', tickvals=list(range(len(top_5_productos_ganancias))),
+                           ticktext=[f'<br>'.join(p.split()) for p in top_5_productos_ganancias.index])
 
 # Mostrar la gráfica de barras de ganancias
 st.header('Top 5 Productos con Mayor Ganancia')
@@ -37,18 +65,25 @@ df_product_summary = pd.concat([ventas_por_producto, ganancias_por_producto], ax
 df_product_summary.columns = ['Ventas Totales', 'Ganancias Totales']
 
 # Crear el gráfico de dispersión
-fig_scatter = px.scatter(df_product_summary, x='Ventas Totales', y='Ganancias Totales', hover_name=df_product_summary.index, title='Relación entre Ventas y Ganancias por Producto')
+fig_scatter = px.scatter(
+    df_product_summary,
+    x='Ventas Totales',
+    y='Ganancias Totales',
+    hover_name=df_product_summary.index,
+    title='Relación entre Ventas y Ganancias por Producto'
+)
 
 # Mostrar el gráfico de dispersión
 st.header('Relación entre Ventas y Ganancias por Producto')
 st.plotly_chart(fig_scatter)
 
+# Resumen del análisis
 st.markdown("""
 ## Resumen del Análisis:
 
 ### Hallazgos Clave
 
-*   Se identificaron los 5 productos con mayores ventas y los 5 productos con mayores ganancias, destacando la importancia de productos como la "Canon imageCLASS 2200 Advanced Copier" en ambos aspectos.
+*   Se identificaron los 5 productos con mayores ventas y los 5 productos con mayores ganancias, destacando la importancia de productos como la **Canon imageCLASS 2200 Advanced Copier** en ambos aspectos.
 *   El gráfico de dispersión muestra la relación entre las ventas y ganancias para todos los productos, permitiendo identificar productos de alto rendimiento y aquellos que podrían requerir atención debido a bajas ganancias a pesar de altas ventas.
 
 ### Próximos Pasos
