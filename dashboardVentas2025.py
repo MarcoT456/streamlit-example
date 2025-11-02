@@ -1,93 +1,179 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import textwrap
 
-st.title('Análisis de Ventas y Ganancias de Productos')
+# --- Configuración de página ---
+st.set_page_config(page_title="Análisis de Ventas y Ganancias", layout="wide")
 
-# Cargar los datos
-file_path = 'Orders Final Clean.xlsx'
+st.title("Análisis de Ventas y Ganancias de Productos")
+
+# --- Cargar los datos ---
+file_path = "/content/drive/MyDrive/Herramientas Datos 2025/Orders Final Clean.xlsx"
 df_orders = pd.read_excel(file_path)
 
-# Calcular las ventas y ganancias totales por producto
-ventas_por_producto = df_orders.groupby('Product Name')['Sales'].sum()
-ganancias_por_producto = df_orders.groupby('Product Name')['Profit'].sum()
+# --- Normalizar columna de fecha ('Order Date') ---
+# Soporta datetime ya correcto, números de serie de Excel, timedelta o strings
+col = "Order Date"
+if pd.api.types.is_datetime64_any_dtype(df_orders[col]):
+    pass  # ya está bien
+elif pd.api.types.is_numeric_dtype(df_orders[col]):
+    # Excel serial date (origen 1899-12-30)
+    origin_date = pd.Timestamp("1899-12-30")
+    df_orders[col] = pd.to_timedelta(df_orders[col], unit="D") + origin_date
+elif pd.api.types.is_timedelta64_dtype(df_orders[col]):
+    origin_date = pd.Timestamp("1899-12-30")
+    df_orders[col] = origin_date + df_orders[col]
+else:
+    # intentar parseo por texto
+    df_orders[col] = pd.to_datetime(df_orders[col], errors="coerce")
 
-# Identificar los top 5 productos por ventas
-top_5_productos_ventas = ventas_por_producto.sort_values(ascending=False).head(5)
+if df_orders[col].isna().all():
+    st.error("No se pudo convertir correctamente la columna 'Order Date' a fecha.")
+    st.stop()
 
-# Crear la gráfica de barras de ventas
+# --- Filtros laterales ---
+with st.sidebar:
+    st.header("Filtros")
+    min_date = df_orders[col].min().date()
+    max_date = df_orders[col].max().date()
+
+    # Selector de rango de fechas en un solo control
+    rango = st.date_input(
+        "Rango de fechas",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date,
+        format="YYYY/MM/DD",
+    )
+
+    # Filtros opcionales si existen columnas
+    region = None
+    estado = None
+    if "Region" in df_orders.columns:
+        region = st.selectbox("Selecciona Región", ["Todas"] + sorted(df_orders["Region"].dropna().unique().tolist()))
+    if "State" in df_orders.columns:
+        estado = st.selectbox("Selecciona Estado", ["Todas"] + sorted(df_orders["State"].dropna().unique().tolist()))
+
+    mostrar_tabla = st.checkbox("Mostrar datos filtrados", value=True)
+
+# Asegurar que el rango siempre tenga (inicio, fin)
+if isinstance(rango, tuple) and len(rango) == 2:
+    start_date, end_date = rango
+else:
+    # compatibilidad por si el widget devuelve una sola fecha
+    start_date, end_date = min_date, max_date
+
+start_ts = pd.Timestamp(start_date)
+end_ts = pd.Timestamp(end_date)
+
+# --- Aplicar filtros ---
+mask = (df_orders[col] >= start_ts) & (df_orders[col] <= end_ts)
+
+if region and region != "Todas":
+    mask &= (df_orders["Region"] == region)
+if estado and estado != "Todas":
+    mask &= (df_orders["State"] == estado)
+
+df_filtered = df_orders.loc[mask].copy()
+
+if df_filtered.empty:
+    st.warning("No hay datos para el rango de fechas (y filtros) seleccionado.")
+    st.stop()
+
+st.success("Datos cargados correctamente.")
+
+# --- Función para envolver etiquetas largas en varias líneas ---
+def wrap_text(txt: str, width: int = 22) -> str:
+    return "<br>".join(textwrap.wrap(str(txt), width=width))
+
+# --- Tabla (dinámica con los filtros) ---
+st.subheader("Datos filtrados")
+if mostrar_tabla:
+    # Selección de columnas más comunes si existen
+    cols_pref = ["Order Date", "Discount", "Sales", "Quantity", "Profit", "Region", "State", "Order ID", "Ship Date", "Product Name"]
+    cols_show = [c for c in cols_pref if c in df_filtered.columns]
+    if not cols_show:
+        cols_show = df_filtered.columns.tolist()
+    st.dataframe(
+        df_filtered[cols_show].sort_values(col),
+        use_container_width=True,
+        hide_index=True,
+    )
+
+# --- Agregaciones para gráficos ---
+ventas_por_producto = df_filtered.groupby("Product Name")["Sales"].sum()
+ganancias_por_producto = df_filtered.groupby("Product Name")["Profit"].sum()
+
+# Top 5 por ventas
+top_5_v = ventas_por_producto.sort_values(ascending=False).head(5)
+
+# --- Gráfico: Top 5 Productos Más Vendidos ---
 fig_ventas = px.bar(
-    x=top_5_productos_ventas.index,
-    y=top_5_productos_ventas.values,
-    labels={'x':'Nombre del Producto', 'y':'Ventas Totales'},
-    title='Top 5 Productos Más Vendidos'
+    x=top_5_v.index,
+    y=top_5_v.values,
+    labels={"x": "Nombre del Producto", "y": "Ventas Totales"},
+    title="Top 5 Productos Más Vendidos",
 )
-
-# Ajustar las etiquetas del eje X para que estén horizontales y ordenadas
 fig_ventas.update_layout(
-    xaxis_tickangle=0,  # mantiene las etiquetas horizontales
-    xaxis_tickfont=dict(size=10),
-    margin=dict(b=150),  # agrega espacio inferior
+    xaxis_tickangle=0,
+    margin=dict(b=160),
 )
-fig_ventas.update_xaxes(tickmode='array', tickvals=list(range(len(top_5_productos_ventas))),
-                        ticktext=[f'<br>'.join(p.split()) for p in top_5_productos_ventas.index])
+fig_ventas.update_xaxes(
+    tickmode="array",
+    tickvals=list(top_5_v.index),
+    ticktext=[wrap_text(n) for n in top_5_v.index],
+)
 
-# Mostrar la gráfica de barras de ventas
-st.header('Top 5 Productos Más Vendidos')
-st.plotly_chart(fig_ventas)
+st.header("Top 5 Productos Más Vendidos")
+st.plotly_chart(fig_ventas, use_container_width=True)
 
-# Identificar los top 5 productos por ganancias
-top_5_productos_ganancias = ganancias_por_producto.sort_values(ascending=False).head(5)
+# Top 5 por ganancias
+top_5_g = ganancias_por_producto.sort_values(ascending=False).head(5)
 
-# Crear la gráfica de barras de ganancias
+# --- Gráfico: Top 5 Productos con Mayor Ganancia ---
 fig_ganancias = px.bar(
-    x=top_5_productos_ganancias.index,
-    y=top_5_productos_ganancias.values,
-    labels={'x':'Nombre del Producto', 'y':'Ganancias Totales'},
-    title='Top 5 Productos con Mayor Ganancia'
+    x=top_5_g.index,
+    y=top_5_g.values,
+    labels={"x": "Nombre del Producto", "y": "Ganancias Totales"},
+    title="Top 5 Productos con Mayor Ganancia",
 )
-
-# Ajustar las etiquetas del eje X igual
 fig_ganancias.update_layout(
     xaxis_tickangle=0,
-    xaxis_tickfont=dict(size=10),
-    margin=dict(b=150),
+    margin=dict(b=160),
 )
-fig_ganancias.update_xaxes(tickmode='array', tickvals=list(range(len(top_5_productos_ganancias))),
-                           ticktext=[f'<br>'.join(p.split()) for p in top_5_productos_ganancias.index])
+fig_ganancias.update_xaxes(
+    tickmode="array",
+    tickvals=list(top_5_g.index),
+    ticktext=[wrap_text(n) for n in top_5_g.index],
+)
 
-# Mostrar la gráfica de barras de ganancias
-st.header('Top 5 Productos con Mayor Ganancia')
-st.plotly_chart(fig_ganancias)
+st.header("Top 5 Productos con Mayor Ganancia")
+st.plotly_chart(fig_ganancias, use_container_width=True)
 
-# Preparar los datos para el gráfico de dispersión
-df_product_summary = pd.concat([ventas_por_producto, ganancias_por_producto], axis=1)
-df_product_summary.columns = ['Ventas Totales', 'Ganancias Totales']
+# --- Dispersión Ventas vs Ganancias ---
+df_summary = pd.concat([ventas_por_producto, ganancias_por_producto], axis=1)
+df_summary.columns = ["Ventas Totales", "Ganancias Totales"]
 
-# Crear el gráfico de dispersión
 fig_scatter = px.scatter(
-    df_product_summary,
-    x='Ventas Totales',
-    y='Ganancias Totales',
-    hover_name=df_product_summary.index,
-    title='Relación entre Ventas y Ganancias por Producto'
+    df_summary,
+    x="Ventas Totales",
+    y="Ganancias Totales",
+    hover_name=df_summary.index,
+    title="Relación entre Ventas y Ganancias por Producto",
 )
+st.header("Relación entre Ventas y Ganancias por Producto")
+st.plotly_chart(fig_scatter, use_container_width=True)
 
-# Mostrar el gráfico de dispersión
-st.header('Relación entre Ventas y Ganancias por Producto')
-st.plotly_chart(fig_scatter)
-
-# Resumen del análisis
+# --- Resumen ---
 st.markdown("""
-## Resumen del Análisis:
+## Resumen del Análisis
 
-### Hallazgos Clave
+**Hallazgos clave**
+- Se identifican los 5 productos con mayores **ventas** y los 5 con mayor **ganancia** dentro del rango seleccionado.
+- La dispersión **Ventas vs Ganancias** ayuda a detectar productos con **alta venta pero baja ganancia** (o viceversa).
 
-*   Se identificaron los 5 productos con mayores ventas y los 5 productos con mayores ganancias, destacando la importancia de productos como la **Canon imageCLASS 2200 Advanced Copier** en ambos aspectos.
-*   El gráfico de dispersión muestra la relación entre las ventas y ganancias para todos los productos, permitiendo identificar productos de alto rendimiento y aquellos que podrían requerir atención debido a bajas ganancias a pesar de altas ventas.
-
-### Próximos Pasos
-
-*   Investigar más a fondo los productos con alta discrepancia entre ventas y ganancias para optimizar estrategias de precios o costos.
-*   Considerar estrategias para replicar el éxito de los productos más rentables en otras categorías.
+**Próximos pasos**
+- Analizar productos con discrepancias entre ventas y ganancias para ajustar **precios**, **costos** o **promociones**.
+- Replicar prácticas de los **más rentables** en otras categorías o segmentos.
 """)
