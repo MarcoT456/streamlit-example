@@ -59,7 +59,7 @@ st.markdown("""
 
 *   Investigar más a fondo los productos con alta discrepancia entre ventas y ganancias para optimizar estrategias de precios o costos.
 *   Considerar estrategias para replicar el éxito de los productos más rentables en otras categorías.
-""")
+
 *   Investigar más a fondo los productos con alta discrepancia entre ventas y ganancias para optimizar estrategias de precios o costos.
 *   Considerar estrategias para replicar el éxito de los productos más rentables en otras categorías.
 """)
