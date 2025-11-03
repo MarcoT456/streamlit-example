@@ -14,7 +14,7 @@ st.title("Análisis de Ventas y Ganancias de Productos")
 # -------------------------
 # Carga y limpieza de datos
 # -------------------------
-file_path = "Orders Final Clean.xlsx"
+file_path = "Orders Clean Final.xlsx"
 df_orders = pd.read_excel(file_path)
 
 # 1) Eliminar duplicados exactos
