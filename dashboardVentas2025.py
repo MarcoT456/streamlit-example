@@ -161,10 +161,10 @@ if mostrar_tabla:
 
     df_display = df_filtered[cols_show].sort_values(col_fecha).copy()
 
-    # Evitar tipos "Duration" (timedelta) que Streamlit/Arrow no soporta bien
+    # Evitar tipos "Duration" (timedelta) que el front no soporta bien
     for c in df_display.columns:
         if pd.api.types.is_timedelta64_dtype(df_display[c]):
-            df_display[c] = df_display[c].astype("timedelta64[D]").astype(str)
+            df_display[c] = df_display[c].astype("string")
 
     st.dataframe(df_display)
 
@@ -376,4 +376,3 @@ st.markdown(
 - Si agregas columnas `Latitude/Longitude` reales por pedido/ciudad, el grid reflejará con mayor precisión los hotspots.
 """
 )
-
