@@ -28,7 +28,7 @@ if "Discount" in df_orders.columns:
 # 3) Unificar Ship Date y remover columna duplicada si existe
 if "Ship Date" in df_orders.columns and "Ship date" in df_orders.columns:
     sd_main = pd.to_datetime(df_orders["Ship Date"], errors="coerce")
-    sd_alt  = pd.to_datetime(df_orders["Ship date"], errors="coerce")
+    sd_alt = pd.to_datetime(df_orders["Ship date"], errors="coerce")
     df_orders["Ship Date"] = sd_main.fillna(sd_alt)
     df_orders = df_orders.drop(columns=["Ship date"])
 
@@ -64,7 +64,6 @@ with st.sidebar:
         value=(min_date, max_date),
         min_value=min_date,
         max_value=max_date,
-        format="YYYY/MM/DD",
         help="Solo puedes elegir fechas dentro del rango disponible en los datos.",
     )
 
@@ -75,9 +74,11 @@ with st.sidebar:
 
     clipped = False
     if start_date < min_date:
-        start_date = min_date; clipped = True
+        start_date = min_date
+        clipped = True
     if end_date > max_date:
-        end_date = max_date; clipped = True
+        end_date = max_date
+        clipped = True
     if clipped:
         st.info("Las fechas seleccionadas se ajustaron automáticamente al rango disponible en los datos.")
 
@@ -125,8 +126,8 @@ def wrap_text(txt: str, width: int = 22) -> str:
 st.subheader("Datos filtrados")
 if mostrar_tabla:
     cols_pref = [
-        "Order Date","Discount","Sales","Quantity","Profit",
-        "Region","State","Order ID","Ship Date","Product Name","City"
+        "Order Date", "Discount", "Sales", "Quantity", "Profit",
+        "Region", "State", "Order ID", "Ship Date", "Product Name", "City"
     ]
     cols_show = [c for c in cols_pref if c in df_filtered.columns]
     if not cols_show:
@@ -242,7 +243,7 @@ else:
     # Peso para agregación por celda
     df_points = df_points.assign(Ventas=df_points["Sales"].astype(float))
 
-    # Color range estilo amarillo→naranja→rojo (como el demo)
+    # Color range estilo amarillo→naranja→rojo
     color_range = [
         [255, 255, 178],
         [254, 217, 118],
@@ -266,14 +267,14 @@ else:
         "GridLayer",
         data=df_points,
         get_position='[lon, lat]',
-        getElevationWeight="Ventas",   # peso de elevación
-        elevation_scale=50,            # escala de altura (ajústala si quieres más/menos columnas)
-        elevation_range=[0, 10000],    # rango máxima altura
+        getElevationWeight="Ventas",
+        elevation_scale=50,
+        elevation_range=[0, 10000],
         extruded=True,
         pickable=True,
-        cell_size=20000,               # tamaño de celda en metros (~20 km); ajusta para más/menos detalle
+        cell_size=20000,
         color_range=color_range,
-        getColorWeight="Ventas",       # también pondera color por ventas
+        getColorWeight="Ventas",
         auto_highlight=True,
     )
 
@@ -285,7 +286,7 @@ else:
     deck = pdk.Deck(
         layers=[grid_layer],
         initial_view_state=view_state,
-        map_style="mapbox://styles/mapbox/dark-v10",  # look oscuro del ejemplo
+        map_style="mapbox://styles/mapbox/dark-v10",
         tooltip=tooltip,
     )
 
@@ -294,7 +295,8 @@ else:
 # -------------------------
 # Resumen final
 # -------------------------
-st.markdown("""
+st.markdown(
+    """
 ## Resumen del Análisis
 
 **Hallazgos clave**
@@ -304,5 +306,6 @@ st.markdown("""
 
 **Próximos pasos**
 - Ajusta `cell_size`, `elevation_scale` o el rango de fechas para explorar distintos patrones espaciales.
-- Si agregas columnas `Latitude/Longitude` reales por pedido/ciudad, el grid reflejará con mayor precisión los hotspots.
-""")
+- Si agregas columnas `Latitude/Longitude` reales por pedido o ciudad, el grid reflejará con mayor precisión los hotspots.
+"""
+)
