@@ -376,3 +376,4 @@ st.markdown(
 - Si agregas columnas `Latitude/Longitude` reales por pedido/ciudad, el grid reflejará con mayor precisión los hotspots.
 """
 )
+
