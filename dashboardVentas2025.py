@@ -4,6 +4,7 @@ import plotly.express as px
 import textwrap
 import pydeck as pdk
 import numpy as np
+import inspect
 
 # -------------------------
 # Configuración de página
@@ -59,13 +60,22 @@ with st.sidebar:
     min_date = df_orders[col_fecha].min().date()
     max_date = df_orders[col_fecha].max().date()
 
-    rango = st.date_input(
-        "Rango de fechas",
+    # Detectar si la versión de Streamlit soporta el parámetro 'format'
+    sig = str(inspect.signature(st.date_input))
+    supports_format = "format" in sig
+
+    date_kwargs = dict(
+        label="Rango de fechas",
         value=(min_date, max_date),
         min_value=min_date,
         max_value=max_date,
         help="Solo puedes elegir fechas dentro del rango disponible en los datos.",
     )
+    if supports_format:
+        # Solo se usa si la versión lo soporta
+        date_kwargs["format"] = "YYYY/MM/DD"
+
+    rango = st.date_input(**date_kwargs)
 
     if isinstance(rango, tuple) and len(rango) == 2:
         start_date, end_date = rango
@@ -80,7 +90,9 @@ with st.sidebar:
         end_date = max_date
         clipped = True
     if clipped:
-        st.info("Las fechas seleccionadas se ajustaron automáticamente al rango disponible en los datos.")
+        st.info(
+            "Las fechas seleccionadas se ajustaron automáticamente al rango disponible en los datos."
+        )
 
     if start_date > end_date:
         start_date, end_date = end_date, start_date
@@ -90,9 +102,15 @@ with st.sidebar:
     region = None
     estado = None
     if "Region" in df_orders.columns:
-        region = st.selectbox("Selecciona Región", ["Todas"] + sorted(df_orders["Region"].dropna().unique().tolist()))
+        region = st.selectbox(
+            "Selecciona Región",
+            ["Todas"] + sorted(df_orders["Region"].dropna().unique().tolist()),
+        )
     if "State" in df_orders.columns:
-        estado = st.selectbox("Selecciona Estado", ["Todas"] + sorted(df_orders["State"].dropna().unique().tolist()))
+        estado = st.selectbox(
+            "Selecciona Estado",
+            ["Todas"] + sorted(df_orders["State"].dropna().unique().tolist()),
+        )
 
     mostrar_tabla = st.checkbox("Mostrar datos filtrados", value=True)
 
@@ -102,9 +120,9 @@ end_ts = pd.Timestamp(end_date)
 
 mask = (df_orders[col_fecha] >= start_ts) & (df_orders[col_fecha] <= end_ts)
 if region and region != "Todas":
-    mask &= (df_orders["Region"] == region)
+    mask &= df_orders["Region"] == region
 if estado and estado != "Todas":
-    mask &= (df_orders["State"] == estado)
+    mask &= df_orders["State"] == estado
 
 df_filtered = df_orders.loc[mask].copy()
 
@@ -126,18 +144,24 @@ def wrap_text(txt: str, width: int = 22) -> str:
 st.subheader("Datos filtrados")
 if mostrar_tabla:
     cols_pref = [
-        "Order Date", "Discount", "Sales", "Quantity", "Profit",
-        "Region", "State", "Order ID", "Ship Date", "Product Name", "City"
+        "Order Date",
+        "Discount",
+        "Sales",
+        "Quantity",
+        "Profit",
+        "Region",
+        "State",
+        "Order ID",
+        "Ship Date",
+        "Product Name",
+        "City",
     ]
     cols_show = [c for c in cols_pref if c in df_filtered.columns]
     if not cols_show:
         cols_show = df_filtered.columns.tolist()
 
-    st.dataframe(
-        df_filtered[cols_show].sort_values(col_fecha),
-        use_container_width=True,
-        hide_index=True,
-    )
+    # OJO: sin parámetros extra para evitar TypeError en versiones viejas
+    st.dataframe(df_filtered[cols_show].sort_values(col_fecha))
 
 # -------------------------
 # Agregaciones para gráficas
@@ -203,34 +227,58 @@ has_latlon = ("Latitude" in df_filtered.columns) and ("Longitude" in df_filtered
 if has_latlon:
     df_points = df_filtered.rename(columns={"Latitude": "lat", "Longitude": "lon"}).copy()
 else:
-    # Fallback a centroides por Estado (USA). Cada fila obtiene el centroide del estado correspondiente.
+    # Fallback a centroides por Estado (USA)
     us_state_centroids = {
-        "Alabama": (32.806671, -86.791130), "Alaska": (61.370716, -152.404419),
-        "Arizona": (33.729759, -111.431221), "Arkansas": (34.969704, -92.373123),
-        "California": (36.116203, -119.681564), "Colorado": (39.059811, -105.311104),
-        "Connecticut": (41.597782, -72.755371), "Delaware": (39.318523, -75.507141),
+        "Alabama": (32.806671, -86.791130),
+        "Alaska": (61.370716, -152.404419),
+        "Arizona": (33.729759, -111.431221),
+        "Arkansas": (34.969704, -92.373123),
+        "California": (36.116203, -119.681564),
+        "Colorado": (39.059811, -105.311104),
+        "Connecticut": (41.597782, -72.755371),
+        "Delaware": (39.318523, -75.507141),
         "District of Columbia": (38.905985, -77.033418),
-        "Florida": (27.766279, -81.686783), "Georgia": (33.040619, -83.643074),
-        "Idaho": (44.240459, -114.478828), "Illinois": (40.349457, -88.986137),
-        "Indiana": (39.849426, -86.258278), "Iowa": (42.011539, -93.210526),
-        "Kansas": (38.526600, -96.726486), "Kentucky": (37.668140, -84.670067),
-        "Louisiana": (31.169546, -91.867805), "Maine": (44.693947, -69.381927),
-        "Maryland": (39.063946, -76.802101), "Massachusetts": (42.230171, -71.530106),
-        "Michigan": (43.326618, -84.536095), "Minnesota": (45.694454, -93.900192),
-        "Mississippi": (32.741646, -89.678696), "Missouri": (38.456085, -92.288368),
-        "Montana": (46.921925, -110.454353), "Nebraska": (41.125370, -98.268082),
-        "Nevada": (38.313515, -117.055374), "New Hampshire": (43.452492, -71.563896),
-        "New Jersey": (40.298904, -74.521011), "New Mexico": (34.840515, -106.248482),
-        "New York": (42.165726, -74.948051), "North Carolina": (35.630066, -79.806419),
-        "North Dakota": (47.528912, -99.784012), "Ohio": (40.388783, -82.764915),
-        "Oklahoma": (35.565342, -96.928917), "Oregon": (44.572021, -122.070938),
-        "Pennsylvania": (40.590752, -77.209755), "Rhode Island": (41.680893, -71.511780),
-        "South Carolina": (33.856892, -80.945007), "South Dakota": (44.299782, -99.438828),
-        "Tennessee": (35.747845, -86.692345), "Texas": (31.054487, -97.563461),
-        "Utah": (40.150032, -111.862434), "Vermont": (44.045876, -72.710686),
-        "Virginia": (37.769337, -78.169968), "Washington": (47.400902, -121.490494),
-        "West Virginia": (38.491226, -80.954453), "Wisconsin": (44.268543, -89.616508),
-        "Wyoming": (42.755966, -107.302490)
+        "Florida": (27.766279, -81.686783),
+        "Georgia": (33.040619, -83.643074),
+        "Idaho": (44.240459, -114.478828),
+        "Illinois": (40.349457, -88.986137),
+        "Indiana": (39.849426, -86.258278),
+        "Iowa": (42.011539, -93.210526),
+        "Kansas": (38.526600, -96.726486),
+        "Kentucky": (37.668140, -84.670067),
+        "Louisiana": (31.169546, -91.867805),
+        "Maine": (44.693947, -69.381927),
+        "Maryland": (39.063946, -76.802101),
+        "Massachusetts": (42.230171, -71.530106),
+        "Michigan": (43.326618, -84.536095),
+        "Minnesota": (45.694454, -93.900192),
+        "Mississippi": (32.741646, -89.678696),
+        "Missouri": (38.456085, -92.288368),
+        "Montana": (46.921925, -110.454353),
+        "Nebraska": (41.125370, -98.268082),
+        "Nevada": (38.313515, -117.055374),
+        "New Hampshire": (43.452492, -71.563896),
+        "New Jersey": (40.298904, -74.521011),
+        "New Mexico": (34.840515, -106.248482),
+        "New York": (42.165726, -74.948051),
+        "North Carolina": (35.630066, -79.806419),
+        "North Dakota": (47.528912, -99.784012),
+        "Ohio": (40.388783, -82.764915),
+        "Oklahoma": (35.565342, -96.928917),
+        "Oregon": (44.572021, -122.070938),
+        "Pennsylvania": (40.590752, -77.209755),
+        "Rhode Island": (41.680893, -71.511780),
+        "South Carolina": (33.856892, -80.945007),
+        "South Dakota": (44.299782, -99.438828),
+        "Tennessee": (35.747845, -86.692345),
+        "Texas": (31.054487, -97.563461),
+        "Utah": (40.150032, -111.862434),
+        "Vermont": (44.045876, -72.710686),
+        "Virginia": (37.769337, -78.169968),
+        "Washington": (47.400902, -121.490494),
+        "West Virginia": (38.491226, -80.954453),
+        "Wisconsin": (44.268543, -89.616508),
+        "Wyoming": (42.755966, -107.302490),
     }
     df_points = df_filtered.copy()
     df_points["lat"] = df_points["State"].map(lambda s: us_state_centroids.get(s, (np.nan, np.nan))[0])
@@ -259,14 +307,14 @@ else:
         longitude=float(df_points["lon"].mean()),
         zoom=4 if has_latlon else 3.5,
         pitch=45,
-        bearing=0
+        bearing=0,
     )
 
-    # GridLayer (agrega por celdas y extruye por ventas)
+    # GridLayer
     grid_layer = pdk.Layer(
         "GridLayer",
         data=df_points,
-        get_position='[lon, lat]',
+        get_position="[lon, lat]",
         getElevationWeight="Ventas",
         elevation_scale=50,
         elevation_range=[0, 10000],
@@ -280,7 +328,7 @@ else:
 
     tooltip = {
         "html": "<b>Ventas agregadas:</b> {elevationValue}",
-        "style": {"backgroundColor": "white", "color": "black"}
+        "style": {"backgroundColor": "white", "color": "black"},
     }
 
     deck = pdk.Deck(
@@ -306,6 +354,6 @@ st.markdown(
 
 **Próximos pasos**
 - Ajusta `cell_size`, `elevation_scale` o el rango de fechas para explorar distintos patrones espaciales.
-- Si agregas columnas `Latitude/Longitude` reales por pedido o ciudad, el grid reflejará con mayor precisión los hotspots.
+- Si agregas columnas `Latitude/Longitude` reales por pedido/ciudad, el grid reflejará con mayor precisión los hotspots.
 """
 )
