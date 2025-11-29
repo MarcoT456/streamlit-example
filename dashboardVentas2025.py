@@ -60,7 +60,7 @@ with st.sidebar:
     min_date = df_orders[col_fecha].min().date()
     max_date = df_orders[col_fecha].max().date()
 
-    # Detectar si la versión de Streamlit soporta el parámetro 'format'
+    # Detectar si la versión de Streamlit soporta 'format' en date_input
     sig = str(inspect.signature(st.date_input))
     supports_format = "format" in sig
 
@@ -72,7 +72,6 @@ with st.sidebar:
         help="Solo puedes elegir fechas dentro del rango disponible en los datos.",
     )
     if supports_format:
-        # Solo se usa si la versión lo soporta
         date_kwargs["format"] = "YYYY/MM/DD"
 
     rango = st.date_input(**date_kwargs)
@@ -160,8 +159,14 @@ if mostrar_tabla:
     if not cols_show:
         cols_show = df_filtered.columns.tolist()
 
-    # OJO: sin parámetros extra para evitar TypeError en versiones viejas
-    st.dataframe(df_filtered[cols_show].sort_values(col_fecha))
+    df_display = df_filtered[cols_show].sort_values(col_fecha).copy()
+
+    # Evitar tipos "Duration" (timedelta) que Streamlit/Arrow no soporta bien
+    for c in df_display.columns:
+        if pd.api.types.is_timedelta64_dtype(df_display[c]):
+            df_display[c] = df_display[c].astype("timedelta64[D]").astype(str)
+
+    st.dataframe(df_display)
 
 # -------------------------
 # Agregaciones para gráficas
@@ -281,17 +286,41 @@ else:
         "Wyoming": (42.755966, -107.302490),
     }
     df_points = df_filtered.copy()
-    df_points["lat"] = df_points["State"].map(lambda s: us_state_centroids.get(s, (np.nan, np.nan))[0])
-    df_points["lon"] = df_points["State"].map(lambda s: us_state_centroids.get(s, (np.nan, np.nan))[1])
+    df_points["lat"] = df_points["State"].map(
+        lambda s: us_state_centroids.get(s, (np.nan, np.nan))[0]
+    )
+    df_points["lon"] = df_points["State"].map(
+        lambda s: us_state_centroids.get(s, (np.nan, np.nan))[1]
+    )
     df_points = df_points.dropna(subset=["lat", "lon"])
 
 if df_points.empty:
     st.info("No hay datos georreferenciados para mostrar en el mapa.")
 else:
-    # Peso para agregación por celda
-    df_points = df_points.assign(Ventas=df_points["Sales"].astype(float))
+    # Ventas numéricas y sin NaN
+    df_points = df_points.assign(
+        Ventas=pd.to_numeric(df_points["Sales"], errors="coerce")
+    )
+    df_points["Ventas"] = df_points["Ventas"].fillna(0.0)
 
-    # Color range estilo amarillo→naranja→rojo
+    # Nos quedamos solo con las columnas que necesita PyDeck
+    df_points = df_points[["lon", "lat", "Ventas"]].copy()
+
+    # Vista inicial segura (sin NaN)
+    mean_lat = df_points["lat"].mean()
+    mean_lon = df_points["lon"].mean()
+    if np.isnan(mean_lat) or np.isnan(mean_lon):
+        mean_lat, mean_lon = 39.5, -98.35  # centro aproximado de USA
+
+    view_state = pdk.ViewState(
+        latitude=float(mean_lat),
+        longitude=float(mean_lon),
+        zoom=4 if has_latlon else 3.5,
+        pitch=45,
+        bearing=0,
+    )
+
+    # GridLayer (agrega por celdas y extruye por ventas)
     color_range = [
         [255, 255, 178],
         [254, 217, 118],
@@ -301,16 +330,6 @@ else:
         [189, 0, 38],
     ]
 
-    # Vista inicial
-    view_state = pdk.ViewState(
-        latitude=float(df_points["lat"].mean()),
-        longitude=float(df_points["lon"].mean()),
-        zoom=4 if has_latlon else 3.5,
-        pitch=45,
-        bearing=0,
-    )
-
-    # GridLayer
     grid_layer = pdk.Layer(
         "GridLayer",
         data=df_points,
